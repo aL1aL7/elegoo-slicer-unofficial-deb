@@ -1,0 +1,10 @@
+Package: @PACKAGE@
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: @MAINTAINER@
+Installed-Size: @INSTALLED_SIZE@
+Depends: @DEPENDS@, ca-certificates
+Recommends: gstreamer1.0-gtk3, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, gstreamer1.0-libav, xdg-utils
+Section: graphics
+Priority: optional
+Homepage: https://github.com/elegooofficial/ElegooSlicer

@@ -1,0 +1,214 @@
+# Build Debian packages of one ElegooSlicer release and publish them.
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Upstream ElegooSlicer tag (e.g. v1.3.2.5)
+        required: true
+        type: string
+      revision:
+        description: Debian revision
+        required: false
+        default: "1"
+        type: string
+      publish:
+        description: Create/update the GitHub release
+        required: false
+        default: true
+        type: boolean
+      cloud:
+        description: Include ELEGOO cloud features (ships the proprietary Agora SDK)
+        required: false
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      revision:
+        required: false
+        default: "1"
+        type: string
+      publish:
+        required: false
+        default: true
+        type: boolean
+      cloud:
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ inputs.tag }}-${{ inputs.revision }}
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: https://github.com/elegooofficial/ElegooSlicer.git
+
+jobs:
+  prepare:
+    name: Resolve sources
+    runs-on: ubuntu-24.04
+    outputs:
+      elegoolink: ${{ steps.resolve.outputs.elegoolink }}
+    steps:
+      - name: Resolve elegoo-link commit
+        id: resolve
+        # Upstream builds elegoo-link from its main branch. Resolve it once so
+        # that all suites use the same commit and the deps cache is keyed on it.
+        run: |
+          set -euo pipefail
+          ref="$(git ls-remote https://github.com/ELEGOO-3D/elegoo-link.git refs/heads/main | cut -f1)"
+          [ -n "$ref" ] || { echo "::error::cannot resolve elegoo-link main"; exit 1; }
+          echo "elegoolink=$ref" >> "$GITHUB_OUTPUT"
+          echo "elegoo-link: $ref"
+
+  build:
+    name: Debian ${{ matrix.suite }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [bookworm, trixie]
+    steps:
+      - name: Check out build scripts
+        uses: actions/checkout@v4
+
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          docker image prune --all --force
+          df -h /
+
+      - name: Fetch upstream source
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          git clone --depth 1 --branch "$TAG" --recurse-submodules --shallow-submodules \
+            "$UPSTREAM_REPO" src
+          echo "DEPS_TREE=$(git -C src rev-parse HEAD:deps)" >> "$GITHUB_ENV"
+
+      - name: Restore bundled dependencies
+        id: deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: work/deps
+          key: deps-v1-${{ matrix.suite }}-${{ env.DEPS_TREE }}-${{ needs.prepare.outputs.elegoolink }}-${{ hashFiles('docker/Dockerfile', 'patches/**') }}-cloud${{ inputs.cloud }}
+          # Patches that only touch the slicer do not affect the deps; the
+          # stamp file checked by build-deb.sh decides whether a hit is usable.
+          restore-keys: |
+            deps-v1-${{ matrix.suite }}-${{ env.DEPS_TREE }}-${{ needs.prepare.outputs.elegoolink }}-
+
+      - name: Build container image
+        run: |
+          docker build --pull --build-arg SUITE=${{ matrix.suite }} \
+            -t elegoo-builder:${{ matrix.suite }} docker
+
+      - name: Build package
+        env:
+          TAG: ${{ inputs.tag }}
+          REVISION: ${{ inputs.revision }}
+          ELEGOOLINK_REF: ${{ needs.prepare.outputs.elegoolink }}
+          CLOUD: ${{ inputs.cloud && '1' || '0' }}
+        run: |
+          mkdir -p work out
+          docker run --rm \
+            -v "$PWD:/build" \
+            -e UPSTREAM_TAG="$TAG" \
+            -e DEB_REVISION="$REVISION" \
+            -e ELEGOOLINK_REF="$ELEGOOLINK_REF" \
+            -e ELEGOO_CLOUD="$CLOUD" \
+            elegoo-builder:${{ matrix.suite }} \
+            /build/scripts/build-deb.sh
+
+      - name: Save bundled dependencies
+        # Also save when the slicer build fails: the deps build is the slow part.
+        if: always() && steps.deps-cache.outputs.cache-hit != 'true' && hashFiles('work/deps/.deps-stamp') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: work/deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Test installation in a clean system
+        run: |
+          docker run --rm -v "$PWD/out:/out:ro" -v "$PWD/scripts:/scripts:ro" \
+            debian:${{ matrix.suite }} /scripts/test-install.sh /out
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.suite }}
+          path: out/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [prepare, build]
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          REVISION: ${{ inputs.revision }}
+          ELEGOOLINK_REF: ${{ needs.prepare.outputs.elegoolink }}
+          CLOUD: ${{ inputs.cloud && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          if [ "$CLOUD" = 1 ]; then
+            variant_note="Like the official build, the packages include the ELEGOO cloud features and therefore the proprietary Agora RTM SDK libraries."
+          else
+            variant_note="ELEGOO cloud features are disabled (no proprietary Agora SDK). Printing over the local network works."
+          fi
+          release_tag="${TAG}-${REVISION}"
+          (cd dist && sha256sum ./*.deb | sed 's| \./| |' > SHA256SUMS)
+
+          cat > notes.md <<EOF
+          Unofficial Debian packages of [ElegooSlicer ${TAG}](https://github.com/elegooofficial/ElegooSlicer/releases/tag/${TAG}),
+          built from source.
+
+          ${variant_note}
+          elegoo-link commit: \`${ELEGOOLINK_REF}\`
+
+          | File | Debian |
+          |------|--------|
+          $(for f in dist/*.deb; do
+              n=$(basename "$f")
+              case "$n" in *~deb12_*) d="12 (bookworm)";; *~deb13_*) d="13 (trixie)";; *) d="?";; esac
+              echo "| \`$n\` | $d |"
+            done)
+
+          Install with:
+
+          \`\`\`sh
+          sudo apt install ./elegoo-slicer_<version>_amd64.deb
+          \`\`\`
+          EOF
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" dist/*.deb dist/SHA256SUMS --clobber
+          else
+            gh release create "$release_tag" dist/*.deb dist/SHA256SUMS \
+              --title "ElegooSlicer ${TAG#v} (Debian revision ${REVISION})" \
+              --notes-file notes.md \
+              --target "$GITHUB_SHA"
+          fi

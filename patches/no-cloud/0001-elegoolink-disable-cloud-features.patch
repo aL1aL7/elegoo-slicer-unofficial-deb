@@ -1,0 +1,19 @@
+Subject: Build elegoo-link without cloud features
+
+The cloud backend links the proprietary Agora RTM SDK and needs private
+credentials (.env) that are not part of the public source. LAN printing
+is unaffected.
+---
+diff --git a/deps/elegoolink/elegoolink.cmake b/deps/elegoolink/elegoolink.cmake
+index ba75284b..078857e9 100644
+--- a/deps/elegoolink/elegoolink.cmake
++++ b/deps/elegoolink/elegoolink.cmake
+@@ -49,7 +49,7 @@ orcaslicer_add_cmake_project(elegoolink
+         -DBUILD_EXAMPLES=OFF
+         -DBUILD_TESTS=OFF
+         -DBUILD_SHARED_LIBS=OFF
+-        -DENABLE_CLOUD_FEATURES=ON
++        -DENABLE_CLOUD_FEATURES=OFF
+         -DAGORA_APP_ID=${AGORA_APP_ID}
+         -DELEGOO_CHINA_IOT_URL=${ELEGOO_CHINA_IOT_URL}
+         -DELEGOO_GLOBAL_IOT_URL=${ELEGOO_GLOBAL_IOT_URL}

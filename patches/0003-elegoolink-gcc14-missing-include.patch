@@ -1,0 +1,17 @@
+Subject: Fix elegoo-link build with GCC 14
+
+event_system.h uses std::find_if without including <algorithm>.
+---
+diff --git a/deps/elegoolink/elegoolink.cmake b/deps/elegoolink/elegoolink.cmake
+index 078857e9..0d7a33f0 100644
+--- a/deps/elegoolink/elegoolink.cmake
++++ b/deps/elegoolink/elegoolink.cmake
+@@ -54,4 +54,7 @@ orcaslicer_add_cmake_project(elegoolink
+         -DELEGOO_CHINA_IOT_URL=${ELEGOO_CHINA_IOT_URL}
+         -DELEGOO_GLOBAL_IOT_URL=${ELEGOO_GLOBAL_IOT_URL}
+         -DELEGOO_INTERNAL_TESTING=${ELEGOO_INTERNAL_TESTING}
++
++    # GCC 14 no longer pulls in <algorithm> transitively (std::find_if).
++    PATCH_COMMAND sh -c "grep -q '#include <algorithm>' include/events/event_system.h || sed -i '/#pragma once/a #include <algorithm>' include/events/event_system.h"
+ )
+\ No newline at end of file

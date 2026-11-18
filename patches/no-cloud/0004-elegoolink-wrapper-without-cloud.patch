@@ -1,0 +1,232 @@
+Subject: Build ElegooLink wrapper without cloud API
+
+With ENABLE_CLOUD_FEATURES off, elegoo-link does not declare its cloud
+methods. Return OPERATION_NOT_IMPLEMENTED for the cloud operations
+instead. With cloud features on, the code is unchanged.
+---
+diff --git a/src/slic3r/Utils/Elegoo/ElegooLink.cpp b/src/slic3r/Utils/Elegoo/ElegooLink.cpp
+index eafc2bca..748f56fb 100644
+--- a/src/slic3r/Utils/Elegoo/ElegooLink.cpp
++++ b/src/slic3r/Utils/Elegoo/ElegooLink.cpp
+@@ -255,6 +255,7 @@ void ElegooLink::init(const std::string& region, std::string& iotUrl, const std:
+     auto webDir = resources_dir();
+     std::replace(webDir.begin(), webDir.end(), '\\', '/');
+     cfg.local.staticWebPath = webDir + "/plugins/elegoolink/web";
++#ifdef ENABLE_CLOUD_FEATURES
+     cfg.cloud.staticWebPath = cfg.local.staticWebPath;
+     std::string caCertDir = resources_dir();
+     std::replace(caCertDir.begin(), caCertDir.end(), '\\', '/');
+@@ -264,6 +265,7 @@ void ElegooLink::init(const std::string& region, std::string& iotUrl, const std:
+     cfg.cloud.userAgent = build_cloud_user_agent();
+     cfg.cloud.region = region;
+     cfg.cloud.baseApiUrl = iotUrl;
++#endif
+     if (!elink::ElegooLink::getInstance().initialize(cfg)) {
+         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": error initializing ElegooLink";
+     }
+@@ -439,6 +441,10 @@ PrinterNetworkResult<PrinterNetworkInfo> ElegooLink::connectToPrinter(const Prin
+ }
+ PrinterNetworkResult<PrinterNetworkInfo> ElegooLink::bindWANPrinter(const PrinterNetworkInfo& printerNetworkInfo)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<PrinterNetworkInfo>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, PrinterNetworkInfo{});
++#else
+     CHECK_INITIALIZED(printerNetworkInfo);
+     PrinterNetworkErrorCode  resultCode = PrinterNetworkErrorCode::UNKNOWN_ERROR;
+     elink::BindPrinterResult elinkResult;
+@@ -486,6 +492,7 @@ PrinterNetworkResult<PrinterNetworkInfo> ElegooLink::bindWANPrinter(const Printe
+         resultCode = PrinterNetworkErrorCode::PRINTER_NETWORK_EXCEPTION;
+     }
+     return PrinterNetworkResult<PrinterNetworkInfo>(resultCode, printerNetworkInfo, parseUnknownErrorMsg(resultCode, elinkResult.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::disconnectFromPrinter(const std::string& printerId)
+@@ -508,6 +515,10 @@ PrinterNetworkResult<bool> ElegooLink::disconnectFromPrinter(const std::string&
+ 
+ PrinterNetworkResult<bool> ElegooLink::unbindWANPrinter(const std::string& serialNumber)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<bool>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, bool{});
++#else
+     CHECK_INITIALIZED(false);
+     PrinterNetworkErrorCode    resultCode = PrinterNetworkErrorCode::UNKNOWN_ERROR;
+     elink::VoidResult          elinkResult;
+@@ -517,10 +528,15 @@ PrinterNetworkResult<bool> ElegooLink::unbindWANPrinter(const std::string& seria
+     resultCode          = parseElegooResult(elinkResult.code);
+     return PrinterNetworkResult<bool>(resultCode, resultCode == PrinterNetworkErrorCode::SUCCESS,
+                                       parseUnknownErrorMsg(resultCode, elinkResult.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::setRegion(const std::string& region, const std::string& iotUrl)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<bool>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, bool{});
++#else
+     CHECK_INITIALIZED(false);
+     elink::SetRegionParams params;
+     params.region  = region;
+@@ -532,6 +548,7 @@ PrinterNetworkResult<bool> ElegooLink::setRegion(const std::string& region, cons
+     PrinterNetworkErrorCode resultCode  = parseElegooResult(elinkResult.code);
+     return PrinterNetworkResult<bool>(resultCode, resultCode == PrinterNetworkErrorCode::SUCCESS,
+                                       parseUnknownErrorMsg(resultCode, elinkResult.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<std::vector<PrinterNetworkInfo>> ElegooLink::discoverPrinters()
+@@ -983,6 +1000,10 @@ PrinterNetworkResult<PrinterPrintTaskResponse> ElegooLink::getPrintTaskList(cons
+ 
+ PrinterNetworkResult<PrinterExceptionResponse> ElegooLink::getExceptionList(const std::string& printerId, int pageNumber, int pageSize)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<PrinterExceptionResponse>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, PrinterExceptionResponse{});
++#else
+     PrinterExceptionResponse exceptionResponse;
+     exceptionResponse.total = 0;
+     exceptionResponse.exceptionList.clear();
+@@ -1012,6 +1033,7 @@ PrinterNetworkResult<PrinterExceptionResponse> ElegooLink::getExceptionList(cons
+     }
+     return PrinterNetworkResult<PrinterExceptionResponse>(resultCode, exceptionResponse,
+                                                           parseUnknownErrorMsg(resultCode, elinkResult.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::deletePrintTasks(const std::string& printerId, const std::vector<std::string>& taskIds)
+@@ -1028,6 +1050,10 @@ PrinterNetworkResult<bool> ElegooLink::deletePrintTasks(const std::string& print
+ 
+ PrinterNetworkResult<bool> ElegooLink::logout(const UserNetworkInfo& userInfo)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<bool>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, bool{});
++#else
+     CHECK_INITIALIZED(false);
+     elink::VoidResult       result     = elink::ElegooLink::getInstance().logout();
+     PrinterNetworkErrorCode resultCode = parseElegooResult(result.code);
+@@ -1035,10 +1061,15 @@ PrinterNetworkResult<bool> ElegooLink::logout(const UserNetworkInfo& userInfo)
+         return PrinterNetworkResult<bool>(resultCode, true);
+     }
+     return PrinterNetworkResult<bool>(resultCode, false, parseUnknownErrorMsg(resultCode, result.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<UserNetworkInfo> ElegooLink::connectToIot(const UserNetworkInfo& userInfo)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<UserNetworkInfo>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, UserNetworkInfo{});
++#else
+     CHECK_INITIALIZED(userInfo);
+     elink::HttpCredential params;
+     params.userId                 = userInfo.userId;
+@@ -1070,6 +1101,7 @@ PrinterNetworkResult<UserNetworkInfo> ElegooLink::connectToIot(const UserNetwork
+         }
+     }
+     return PrinterNetworkResult<UserNetworkInfo>(resultCode, userInfoRet, parseUnknownErrorMsg(resultCode, setHttpCredentialResult.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::updatePrinterName(const std::string& printerId, const std::string& printerName)
+@@ -1090,6 +1122,10 @@ PrinterNetworkResult<bool> ElegooLink::updatePrinterName(const std::string& prin
+ 
+ PrinterNetworkResult<bool> ElegooLink::cancelBindPrinter(const std::string& serialNumber)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<bool>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, bool{});
++#else
+     CHECK_INITIALIZED(false);
+     PrinterNetworkErrorCode resultCode = PrinterNetworkErrorCode::UNKNOWN_ERROR;
+     elink::VoidResult              result;
+@@ -1099,9 +1135,14 @@ PrinterNetworkResult<bool> ElegooLink::cancelBindPrinter(const std::string& seri
+     resultCode = parseElegooResult(result.code);
+     return PrinterNetworkResult<bool>(resultCode, resultCode == PrinterNetworkErrorCode::SUCCESS,
+                                       parseUnknownErrorMsg(resultCode, result.message));
++#endif
+ }   
+ PrinterNetworkResult<UserNetworkInfo> ElegooLink::getRtcToken()
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<UserNetworkInfo>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, UserNetworkInfo{});
++#else
+     CHECK_INITIALIZED(UserNetworkInfo());
+     UserNetworkInfo          userInfo;
+     elink::GetRtcTokenResult result     = elink::ElegooLink::getInstance().getRtcToken();
+@@ -1115,10 +1156,15 @@ PrinterNetworkResult<UserNetworkInfo> ElegooLink::getRtcToken()
+         }
+     }
+     return PrinterNetworkResult<UserNetworkInfo>(resultCode, userInfo, parseUnknownErrorMsg(resultCode, result.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<UserNetworkInfo> ElegooLink::refreshToken(const UserNetworkInfo& userInfo)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<UserNetworkInfo>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, UserNetworkInfo{});
++#else
+     CHECK_INITIALIZED(userInfo);
+     UserNetworkInfo       userInfoRet = userInfo;
+     elink::HttpCredential params;
+@@ -1143,10 +1189,15 @@ PrinterNetworkResult<UserNetworkInfo> ElegooLink::refreshToken(const UserNetwork
+     }
+ 
+     return PrinterNetworkResult<UserNetworkInfo>(resultCode, userInfoRet, parseUnknownErrorMsg(resultCode, httpCredentialResult.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::sendRtmMessage(const std::string& printerId, const std::string& message)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<bool>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, bool{});
++#else
+     CHECK_INITIALIZED(false);
+     elink::SendRtmMessageParams params;
+     params.printerId                   = printerId;
+@@ -1155,10 +1206,15 @@ PrinterNetworkResult<bool> ElegooLink::sendRtmMessage(const std::string& printer
+     PrinterNetworkErrorCode resultCode = parseElegooResult(result.code);
+     return PrinterNetworkResult<bool>(resultCode, resultCode == PrinterNetworkErrorCode::SUCCESS,
+                                       parseUnknownErrorMsg(resultCode, result.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<std::vector<LicenseExpiredDevice>> ElegooLink::getLicenseExpiredDevices()
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<std::vector<LicenseExpiredDevice>>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, std::vector<LicenseExpiredDevice>{});
++#else
+     CHECK_INITIALIZED(std::vector<LicenseExpiredDevice>());
+ 
+     elink::GetLicenseExpiredDevicesResult result = elink::ElegooLink::getInstance().getLicenseExpiredDevices();
+@@ -1176,10 +1232,15 @@ PrinterNetworkResult<std::vector<LicenseExpiredDevice>> ElegooLink::getLicenseEx
+     
+     return PrinterNetworkResult<std::vector<LicenseExpiredDevice>>(resultCode, devices,
+                                       parseUnknownErrorMsg(resultCode, result.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::renewLicense(const std::string& serialNumber)
+ {
++#ifndef ENABLE_CLOUD_FEATURES
++    // Cloud features are disabled in this build (no proprietary Agora SDK).
++    return PrinterNetworkResult<bool>(PrinterNetworkErrorCode::OPERATION_NOT_IMPLEMENTED, bool{});
++#else
+     CHECK_INITIALIZED(false);
+     
+     elink::RenewLicenseParams params;
+@@ -1189,6 +1250,7 @@ PrinterNetworkResult<bool> ElegooLink::renewLicense(const std::string& serialNum
+     
+     return PrinterNetworkResult<bool>(resultCode, resultCode == PrinterNetworkErrorCode::SUCCESS,
+                                       parseUnknownErrorMsg(resultCode, result.message));
++#endif
+ }
+ 
+ PrinterNetworkResult<bool> ElegooLink::refreshPrinterStatus(const std::string& printerId)

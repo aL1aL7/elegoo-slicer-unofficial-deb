@@ -1,0 +1,18 @@
+Subject: Copy Agora libraries only if they exist
+
+With cloud features disabled the Agora SDK is not built, and the
+unconditional POST_BUILD copy would fail.
+---
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 3abc860a..7807d7d4 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -296,7 +296,7 @@ else ()
+     endif ()
+     
+     # Copy Agora libraries for Linux
+-    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
++    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND EXISTS "${CMAKE_PREFIX_PATH}/bin/libagora_rtm_sdk.so")
+         add_custom_command(TARGET ElegooSlicer POST_BUILD
+             COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                 "${CMAKE_PREFIX_PATH}/bin/libaosl.so"

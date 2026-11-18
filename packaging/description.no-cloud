@@ -1,0 +1,8 @@
+Description: 3D printer slicer by ELEGOO (based on OrcaSlicer)
+ ElegooSlicer converts 3D models (STL, 3MF, STEP, OBJ, ...) into G-code for
+ FDM 3D printers. It is based on OrcaSlicer and ships printer, filament and
+ process profiles for ELEGOO printers.
+ .
+ This is an unofficial build of the upstream release, installed into
+ /opt/elegoo-slicer. ELEGOO cloud features are disabled because they depend
+ on a proprietary SDK; printing over the local network works.

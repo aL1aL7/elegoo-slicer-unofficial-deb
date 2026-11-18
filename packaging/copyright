@@ -1,0 +1,40 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: ElegooSlicer
+Upstream-Contact: https://github.com/elegooofficial/ElegooSlicer/issues
+Source: https://github.com/elegooofficial/ElegooSlicer/tree/@UPSTREAM_TAG@
+Comment:
+ Unofficial binary build. ElegooSlicer is derived from OrcaSlicer, which is
+ derived from BambuStudio, PrusaSlicer and Slic3r. The program statically
+ bundles third-party libraries (Boost, wxWidgets, OpenCASCADE, CGAL, OpenVDB,
+ TBB, ...); their sources and licenses are part of the upstream source tree
+ referenced above. The full upstream license text is installed as
+ /usr/share/doc/elegoo-slicer/LICENSE.
+ .
+ The bundled elegoo-link library is built from
+ https://github.com/ELEGOO-3D/elegoo-link, commit @ELEGOOLINK_REF@.
+ Patches applied to the upstream source are published in the packaging
+ repository.
+
+Files: *
+Copyright: ELEGOO and the ElegooSlicer contributors
+           SoftFever and the OrcaSlicer contributors
+           Bambulab and the BambuStudio contributors
+           Prusa Research and the PrusaSlicer contributors
+           Alessandro Ranellucci and the Slic3r contributors
+License: AGPL-3+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Affero General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU Affero General Public License for more details.
+
+Files: opt/elegoo-slicer/bin/elegoo-slicer
+Comment: statically linked elegoo-link library
+Copyright: ELEGOO
+License: Apache-2.0
+ On Debian systems, the full text of the Apache License 2.0 can be found in
+ /usr/share/common-licenses/Apache-2.0.

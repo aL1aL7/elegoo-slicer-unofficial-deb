@@ -1,0 +1,61 @@
+# Poll ElegooSlicer for new releases and build packages for them.
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Check upstream
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if a release for the latest tag exists
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check-upstream
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.latest.outputs.tag }}
+      build: ${{ steps.latest.outputs.build }}
+    steps:
+      - name: Look up latest upstream release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          set -euo pipefail
+          # "latest" skips drafts and pre-releases.
+          tag="$(gh api repos/elegooofficial/ElegooSlicer/releases/latest --jq .tag_name)"
+          [ -n "$tag" ] || { echo "::error::could not determine upstream tag"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          if [ "$FORCE" = "true" ]; then
+            echo "Forced rebuild of $tag"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif gh release view "${tag}-1" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release ${tag}-1 already exists, nothing to do"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New upstream release $tag"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ needs.check.outputs.tag }}
+      revision: "1"
+      publish: true
+    secrets: inherit

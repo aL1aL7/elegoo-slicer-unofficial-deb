@@ -1,0 +1,9 @@
+
+Files: opt/elegoo-slicer/bin/libagora_rtm_sdk.so
+       opt/elegoo-slicer/bin/libaosl.so
+Copyright: Agora.io
+License: proprietary
+ Binary-only Agora RTM SDK, redistributed as part of elegoo-link
+ (thirdparty/agora/linux) to provide the ELEGOO cloud features. These files
+ are not free software. Package variants built with ELEGOO_CLOUD=0 do not
+ contain them.
